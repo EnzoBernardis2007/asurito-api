@@ -1,12 +1,12 @@
 const db = require('./db')
 
 const getGenders = async () => {
-    const query = 'SELECT name FROM gender'
+    const query = 'SELECT * FROM gender'
 
     return new Promise((resolve, reject) => {
         db.query(query, (err, results) => {
             if (err) {
-                console.error('Erro ao pegar gêneros:', err)
+                console.error('Error picking up genders:', err)
                 reject(err) 
             } else {
                 resolve(results) 
