@@ -27,6 +27,60 @@ app.get('/getGenders', async (request, response) => {
     }
 })
 
+app.post('/postNewAthlete', (request, response) => {
+    const { email,
+        password,
+        cpf,
+        fullName,
+        socialName,
+        gender,
+        birthDate,
+        height,
+        weight,
+        sex,
+        kyu,
+        dan,
+        dojo,
+        city } = request.body
+
+    const { salt, hash } = passwordManager.hashPasswordWithSalt(password)
+
+    const values = [email, hash, salt, cpf, fullName, socialName, gender, birthDate,
+        height, weight, sex, kyu, dan, dojo, city 
+    ]
+    
+    const query = `
+    INSERT INTO athlete (
+        email, 
+        password_hash, 
+        salt, 
+        cpf, 
+        full_legal_name, 
+        prefered_name, 
+        gender_name, 
+        birthday, 
+        height, 
+        weight, 
+        sex, 
+        kyu, 
+        dan, 
+        dojo, 
+        city
+    ) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+    
+    db.query(query, values, (err, results) => {
+        if (err) {
+            console.error("Error inserting athlete:", err);
+            return response.status(500).json({ message: 'Error to insert athlete info', error: err });
+        }
+
+        return response.status(200).json({ message: 'Success' }) 
+    })
+})
+
+
 // Start message
 const PORT = 3000
 

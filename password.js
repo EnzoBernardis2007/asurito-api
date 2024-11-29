@@ -1,11 +1,11 @@
-const crypto = require('crypto')
+const crypto = require('crypto');
 
 function hashPasswordWithSalt(password) {
-    const salt = crypto.randomBytes(16).toString('hex') 
+    const salt = crypto.randomBytes(16).toString('hex'); 
   
-    const hash = crypto.createHmac('sha512', salt).update(password).digest('hex') 
+    const hash = crypto.createHmac('sha256', salt).update(password).digest('hex'); 
   
-    return { salt, hash }
+    return { salt, hash };
 }
 
-module.exports = { hashPasswordWithSalt }
+module.exports = { hashPasswordWithSalt };
