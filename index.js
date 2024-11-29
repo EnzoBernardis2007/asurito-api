@@ -32,6 +32,21 @@ app.get('/getGenders', async (request, response) => {
     }
 })
 
+app.get('/getChampionships', async (request, response) => {
+    try {
+        const championshipsList = await getInfo.getChampionships()
+
+        response.status(200).json({
+            championshipsList,
+            message: 'Success'
+        })
+    } catch {
+        response.status(500).json({
+            message: 'Error when taking championship data'
+        })
+    }
+})
+
 app.post('/postNewAthlete', (request, response) => {
     const { email,
         password,
@@ -85,7 +100,7 @@ app.post('/postNewAthlete', (request, response) => {
     })
 })
 
-app.get("/login", async (request, response) => {
+app.post("/login", async (request, response) => {
     const { email, password } = request.body;
 
     try {
@@ -107,10 +122,6 @@ app.get("/login", async (request, response) => {
         response.status(500).json({ message: "Error in the server.", error: error.message });
     }
 });
-
-app.post('/test', authenticate, (request, response) => {
-    console.log('cheguei')
-})
 
 // Start message
 app.listen(PORT, () => {

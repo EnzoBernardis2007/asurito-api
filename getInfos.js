@@ -15,4 +15,19 @@ const getGenders = async () => {
     })
 }
 
-module.exports = { getGenders }
+const getChampionships = async () => {
+    const query = 'SELECT * FROM championship WHERE accepting_athletes = true'
+
+    return new Promise((resolve, reject) => {
+        db.query(query, (err, results) => {
+            if(err) {
+                console.log('Error picking up championships', err)
+                reject(err)
+            } else {
+                resolve(results)
+            }
+        })
+    })
+}
+
+module.exports = { getGenders, getChampionships }
