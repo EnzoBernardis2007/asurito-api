@@ -1,3 +1,6 @@
 express
 cors
 mysql2
+dotenv 
+jsonwebtoken 
+body-parser

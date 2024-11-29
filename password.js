@@ -8,4 +8,11 @@ function hashPasswordWithSalt(password) {
     return { salt, hash };
 }
 
-module.exports = { hashPasswordWithSalt };
+function comparePassword(password, salt, storedHash) {
+    const hash = crypto.createHmac('sha256', salt).update(password).digest('hex');
+
+    return hash === storedHash;
+}
+
+
+module.exports = { hashPasswordWithSalt, comparePassword };
