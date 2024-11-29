@@ -32,7 +32,7 @@ app.get('/getGenders', async (request, response) => {
     }
 })
 
-app.get('/getChampionships', async (request, response) => {
+app.get('/getChampionships', authenticate, async (request, response) => {
     try {
         const championshipsList = await getInfo.getChampionships()
 
@@ -122,6 +122,20 @@ app.post("/login", async (request, response) => {
         response.status(500).json({ message: "Error in the server.", error: error.message });
     }
 });
+
+app.post('/inscription', authenticate, async (request, response) => {
+    const { idAthlete, idChampionship } = request.body
+
+    const query = 'INSERT INTO inscription VALUES(UUID(), ?, ?)'
+
+    db.query(query, [idAthlete, idChampionship], (err, results) => {
+        if (err) {
+            return response.status(500).json({ message: 'Error to insert inscription'} )
+        }
+
+        return response.status(200).json({ message: 'Success' })
+    })
+})
 
 // Start message
 app.listen(PORT, () => {
