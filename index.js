@@ -143,13 +143,44 @@ app.post('/inscription', authenticate, async (request, response) => {
 })
 
 app.get('/profile', authenticate, async (request, response) => {
-    const { cpf } = request.body
+    const { cpf } = request.query
 
-    const query = 'SELECT * FROM athlete WHERE cpf = ?'
+    if (!cpf) {
+        return response.status(400).json({ message: 'CPF is required' })
+    }
+
+    const query = `
+    SELECT 
+        athlete.email,
+        athlete.password_hash,
+        athlete.salt,
+        athlete.cpf,
+        athlete.full_legal_name,
+        athlete.prefered_name,
+        gender.ptbr_name AS gender_name,
+        athlete.birthday,
+        athlete.height,
+        athlete.weight,
+        athlete.sex,
+        athlete.kyu,
+        athlete.dan,
+        athlete.dojo,
+        athlete.city,
+        athlete.wins,
+        athlete.defeats
+    FROM athlete
+    JOIN gender
+    ON athlete.gender_name = gender.name
+    WHERE athlete.cpf = ?;
+`;
 
     db.query(query, [cpf], (err, results) => {
-        if(err) {
-            return response.status(500).json({ message: 'Error to get athlete info'})
+        if (err) {
+            return response.status(500).json({ message: 'Error to get athlete info' })
+        }
+
+        if (results.length === 0) {
+            return response.status(404).json({ message: 'Athlete not found' })
         }
 
         const athlete = results[0]
@@ -157,6 +188,7 @@ app.get('/profile', authenticate, async (request, response) => {
         return response.status(200).json({ athlete })
     })
 })
+
 
 // Start message
 app.listen(PORT, () => {
