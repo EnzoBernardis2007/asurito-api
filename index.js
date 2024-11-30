@@ -142,6 +142,22 @@ app.post('/inscription', authenticate, async (request, response) => {
     })
 })
 
+app.get('/profile', authenticate, async (request, response) => {
+    const { cpf } = request.body
+
+    const query = 'SELECT * FROM athlete WHERE cpf = ?'
+
+    db.query(query, [cpf], (err, results) => {
+        if(err) {
+            return response.status(500).json({ message: 'Error to get athlete info'})
+        }
+
+        const athlete = results[0]
+
+        return response.status(200).json({ athlete })
+    })
+})
+
 // Start message
 app.listen(PORT, () => {
     console.log(`Rodando o servidor em http://localhost:${PORT}`)
