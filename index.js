@@ -32,7 +32,26 @@ app.get('/getGenders', async (request, response) => {
     }
 })
 
-app.get('/getChampionships', authenticate, async (request, response) => {
+app.get('/brackets/:championship_id', async (request, response) => {
+    const { championship_id } = request.params
+
+    if(!championship_id) {
+        return response.status(400).json({ error: "No championship id provided" })
+    }
+
+    const query = 'CALL GetBracketsByChampionship(?)'
+
+    db.query(query, [championship_id], (err, results) => {
+        if (err) {
+            console.error("Error fetching brackets:", err)
+            return response.status(500).json({ message: 'Error fetching brackets', error: err })
+        }
+
+        return response.status(200).json({ brackets: results[0], message: 'Success' })
+    })
+})
+
+app.get('/getChampionships', async (request, response) => {
     try {
         const championshipsList = await getInfo.getChampionships()
 
