@@ -3,6 +3,7 @@ const express = require('express')
 const cors = require('cors')
 const jwt = require("jsonwebtoken")
 const bodyParser = require("body-parser")
+const crypto = require("crypto")
 
 // my files
 const db = require('./db')
@@ -131,19 +132,18 @@ app.post("/login", async (request, response) => {
             if (results.length === 0) return response.status(400).json({ message: "No account is associated with this email" })
 
             const user = results[0]
-
             const isPasswordValid = passwordManager.comparePassword(password, user.salt, user.password_hash)
 
             if (!isPasswordValid) return response.status(400).json({ message: "Invalid password" })
 
-            const token = jwt.sign({ id: user.cpf, email: user.email }, SECRET_KEY, { expiresIn: "1h" })
-            const cpf = user.cpf
-            response.status(200).json({ token, cpf })
+            const token = jwt.sign({ id: user.id, email: user.email }, SECRET_KEY, { expiresIn: "1h" })
+            return response.status(200).json({ token, encrypted_cpf: user.encrypted_cpf })
         })
     } catch (error) {
         response.status(500).json({ message: "Error in the backend.", error: error.message })
     }
 })
+
 
 app.post('/inscription', authenticate, async (request, response) => {
     const { cpf, idChampionship } = request.body
@@ -152,11 +152,12 @@ app.post('/inscription', authenticate, async (request, response) => {
         return response.status(400).json({ message: 'Missing required fields' })
     }
 
-    const query = 'INSERT INTO inscription VALUES(UUID(), ?, ?)'
+    const encryptedCpf = crypto.createHash('sha256').update(cpf).digest('hex')
 
-    db.query(query, [cpf, idChampionship], (err, results) => {
+    const query = 'INSERT INTO inscription VALUES(UUID(), ?, ?)'
+    db.query(query, [encryptedCpf, idChampionship], (err) => {
         if (err) {
-            return response.status(500).json({ message: 'Error to insert inscription', insert: false})
+            return response.status(500).json({ message: 'Error to insert inscription', insert: false })
         }
 
         return response.status(200).json({ message: 'Success', insert: true })
@@ -170,32 +171,34 @@ app.get('/athlete', authenticate, async (request, response) => {
         return response.status(400).json({ message: 'CPF is required' })
     }
 
-    const query = `
-    SELECT 
-        athlete.email,
-        athlete.password_hash,
-        athlete.salt,
-        athlete.cpf,
-        athlete.full_legal_name,
-        athlete.prefered_name,
-        gender.ptbr_name AS gender_name,
-        athlete.birthday,
-        athlete.height,
-        athlete.weight,
-        athlete.sex,
-        athlete.kyu,
-        athlete.dan,
-        athlete.dojo,
-        athlete.city,
-        athlete.wins,
-        athlete.defeats
-    FROM athlete
-    JOIN gender
-    ON athlete.gender_name = gender.name
-    WHERE athlete.cpf = ?;
-`;
+    const encryptedCpf = crypto.createHash('sha256').update(cpf).digest('hex')
 
-    db.query(query, [cpf], (err, results) => {
+    const query = `
+        SELECT 
+            athlete.email,
+            athlete.password_hash,
+            athlete.salt,
+            athlete.encrypted_cpf,
+            athlete.full_legal_name,
+            athlete.prefered_name,
+            gender.ptbr_name AS gender_name,
+            athlete.birthday,
+            athlete.height,
+            athlete.weight,
+            athlete.sex,
+            athlete.kyu,
+            athlete.dan,
+            athlete.dojo,
+            athlete.city,
+            athlete.wins,
+            athlete.defeats
+        FROM athlete
+        JOIN gender
+        ON athlete.gender_name = gender.name
+        WHERE athlete.encrypted_cpf = ?
+    `
+
+    db.query(query, [encryptedCpf], (err, results) => {
         if (err) {
             return response.status(500).json({ message: 'Error to get athlete info' })
         }
@@ -204,14 +207,10 @@ app.get('/athlete', authenticate, async (request, response) => {
             return response.status(404).json({ message: 'Athlete not found' })
         }
 
-        const athlete = results[0]
-
-        return response.status(200).json({ athlete })
+        return response.status(200).json({ athlete: results[0] })
     })
 })
 
-
-// Start message
 app.listen(PORT, () => {
     console.log(`Rodando o servidor em http://localhost:${PORT}`)
 })
