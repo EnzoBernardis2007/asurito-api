@@ -38,7 +38,7 @@ app.get('/brackets/:championship_id', async (request, response) => {
         return response.status(400).json({ error: "No championship id provided" })
     }
 
-    const query = 'CALL GetBracketsByChampionship(?)'
+    const query = 'CALL GetBracketsDetailsByChampionship(?)'
 
     db.query(query, [championship_id], (err, results) => {
         if (err) {
@@ -46,7 +46,11 @@ app.get('/brackets/:championship_id', async (request, response) => {
             return response.status(500).json({ message: 'Error fetching brackets', error: err })
         }
 
-        return response.status(200).json({ brackets: results[0], message: 'Success' })
+        if(results[0] == {}) {
+            return response.status(400).json({ message: "No championship associated with this ID"})
+        }
+
+        return response.status(200).json({ ...results[0] })
     })
 })
 
@@ -55,8 +59,7 @@ app.get('/championships', async (request, response) => {
         const championshipsList = await getInfo.getChampionships()
 
         response.status(200).json({
-            championshipsList,
-            message: 'Success'
+            ...championshipsList
         })
     } catch {
         response.status(500).json({
@@ -111,10 +114,10 @@ app.post('/athlete', (request, response) => {
     db.query(query, values, (err, results) => {
         if (err) {
             console.error("Error inserting athlete:", err)
-            return response.status(500).json({ message: 'Error to insert athlete info', error: err })
+            return response.status(500).json({ message: 'Error to insert athlete info', error: err, insert: false })
         }
 
-        return response.status(200).json({ message: 'Success' }) 
+        return response.status(200).json({ message: 'Success', insert: true }) 
     })
 })
 
@@ -125,20 +128,20 @@ app.post("/login", async (request, response) => {
         const query = 'SELECT * FROM athlete WHERE email = ?'
 
         db.query(query, [email], (err, results) => {
-            if (results.length === 0) return response.status(400).json({ message: "Invalid info" })
+            if (results.length === 0) return response.status(400).json({ message: "No account is associated with this email" })
 
             const user = results[0]
 
             const isPasswordValid = passwordManager.comparePassword(password, user.salt, user.password_hash)
 
-            if (!isPasswordValid) return response.status(400).json({ message: "Invalid info" })
+            if (!isPasswordValid) return response.status(400).json({ message: "Invalid password" })
 
             const token = jwt.sign({ id: user.cpf, email: user.email }, SECRET_KEY, { expiresIn: "1h" })
             const cpf = user.cpf
             response.status(200).json({ token, cpf })
         })
     } catch (error) {
-        response.status(500).json({ message: "Error in the server.", error: error.message })
+        response.status(500).json({ message: "Error in the backend.", error: error.message })
     }
 })
 
@@ -153,10 +156,10 @@ app.post('/inscription', authenticate, async (request, response) => {
 
     db.query(query, [cpf, idChampionship], (err, results) => {
         if (err) {
-            return response.status(500).json({ message: 'Error to insert inscription'} )
+            return response.status(500).json({ message: 'Error to insert inscription', insert: false})
         }
 
-        return response.status(200).json({ message: 'Success' })
+        return response.status(200).json({ message: 'Success', insert: true })
     })
 })
 
