@@ -17,13 +17,12 @@ const PORT = process.env.PORT
 app.use(express.json())
 app.use(cors())
 
-app.get('/getGenders', async (request, response) => {
+app.get('/genders', async (request, response) => {
     try {
         const gendersList = await getInfo.getGenders()
 
         response.status(200).json({
-            gendersList,
-            message: 'Success'
+            ...gendersList
         })
     } catch {
         response.status(500).json({
@@ -51,7 +50,7 @@ app.get('/brackets/:championship_id', async (request, response) => {
     })
 })
 
-app.get('/getChampionships', async (request, response) => {
+app.get('/championships', async (request, response) => {
     try {
         const championshipsList = await getInfo.getChampionships()
 
@@ -66,7 +65,7 @@ app.get('/getChampionships', async (request, response) => {
     }
 })
 
-app.post('/postNewAthlete', (request, response) => {
+app.post('/athlete', (request, response) => {
     const { email,
         password,
         cpf,
@@ -161,7 +160,7 @@ app.post('/inscription', authenticate, async (request, response) => {
     })
 })
 
-app.get('/profile', authenticate, async (request, response) => {
+app.get('/athlete', authenticate, async (request, response) => {
     const { cpf } = request.query
 
     if (!cpf) {
