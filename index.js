@@ -1,15 +1,15 @@
-// Configs
-const express = require('express')
-const cors = require('cors')
-const jwt = require("jsonwebtoken")
-const bodyParser = require("body-parser")
-const crypto = require("crypto")
+import express from "express";
+import cors from "cors";
+import jwt from "jsonwebtoken";
+import bodyParser from "body-parser";
+import crypto from "crypto";
+import { v4 as uuidv4 } from "uuid";
 
 // my files
-const db = require('./db')
-const passwordManager = require('./password')
-const getInfo = require('./getInfos')
-const authenticate = require('./auth')
+import db from "./db.js";
+import * as passwordManager from "./password.js";
+import * as getInfo from "./getInfos.js";
+import authenticate from "./auth.js";
 
 const app = express()
 const SECRET_KEY = process.env.SECRET_KEY
@@ -69,34 +69,62 @@ app.get('/championships', async (request, response) => {
     }
 })
 
-app.post('/athlete', (request, response) => {
-    const { email,
-        password,
-        cpf,
-        fullName,
-        socialName,
-        gender,
-        birthDate,
-        height,
-        weight,
-        sex,
-        kyu,
-        dan,
-        dojo,
-        city } = request.body
+app.post("/athlete", (request, response) => {
+  try {
+    const {
+      email,
+      password,
+      cpf,
+      fullName,
+      socialName,
+      gender,
+      birthday,
+      height,
+      weight,
+      sex,
+      kyu,
+      dan,
+      dojo,
+      city,
+    } = request.body
 
+    // gera uuid
+    const id = uuidv4()
+
+    // gera hash da senha
     const { salt, hash } = passwordManager.hashPasswordWithSalt(password)
 
-    const values = [email, hash, salt, cpf, fullName, socialName, gender, birthDate,
-        height, weight, sex, kyu, dan, dojo, city 
+    // TODO: aqui você precisa criptografar o CPF
+    const encryptedCpf = passwordManager.encryptCPF(cpf) 
+
+    const values = [
+      id,
+      email,
+      hash,
+      salt,
+      encryptedCpf,
+      fullName,
+      socialName || null,
+      gender,
+      birthday,
+      parseFloat(height),
+      parseInt(weight, 10),
+      sex,
+      parseInt(kyu, 10),
+      parseInt(dan, 10),
+      dojo,
+      city,
+      0, // wins inicial
+      0, // defeats inicial
     ]
-    
+
     const query = `
-    INSERT INTO athlete (
+      INSERT INTO athlete (
+        id,
         email, 
         password_hash, 
         salt, 
-        cpf, 
+        encrypted_cpf, 
         full_legal_name, 
         prefered_name, 
         gender_name, 
@@ -107,20 +135,33 @@ app.post('/athlete', (request, response) => {
         kyu, 
         dan, 
         dojo, 
-        city
-    ) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        city,
+        wins,
+        defeats
+      ) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `
 
-    
     db.query(query, values, (err, results) => {
-        if (err) {
-            console.error("Error inserting athlete:", err)
-            return response.status(500).json({ message: 'Error to insert athlete info', error: err, insert: false })
-        }
+      if (err) {
+        console.error("Error inserting athlete:", err)
+        return response.status(500).json({
+          message: "Error to insert athlete info",
+          error: err,
+          insert: false,
+        })
+      }
 
-        return response.status(200).json({ message: 'Success', insert: true }) 
+      return response
+        .status(201)
+        .json({ message: "Success", insert: true, id })
     })
+  } catch (err) {
+    console.error(err)
+    return response.status(500).json({ message: "Unexpected error", insert: false })
+  }
 })
+
 
 app.post("/login", async (request, response) => {
     const { email, password } = request.body
@@ -137,25 +178,22 @@ app.post("/login", async (request, response) => {
             if (!isPasswordValid) return response.status(400).json({ message: "Invalid password" })
 
             const token = jwt.sign({ id: user.id, email: user.email }, SECRET_KEY, { expiresIn: "1h" })
-            return response.status(200).json({ token, encrypted_cpf: user.encrypted_cpf })
+            return response.status(200).json({ token, id: user.id })
         })
     } catch (error) {
         response.status(500).json({ message: "Error in the backend.", error: error.message })
     }
 })
 
-
 app.post('/inscription', authenticate, async (request, response) => {
-    const { cpf, idChampionship } = request.body
+    const { userId, idChampionship } = request.body
 
-    if (!cpf || !idChampionship) {
+    if (!userId || !idChampionship) {
         return response.status(400).json({ message: 'Missing required fields' })
     }
 
-    const encryptedCpf = crypto.createHash('sha256').update(cpf).digest('hex')
-
     const query = 'INSERT INTO inscription VALUES(UUID(), ?, ?)'
-    db.query(query, [encryptedCpf, idChampionship], (err) => {
+    db.query(query, [userId, idChampionship], (err) => {
         if (err) {
             return response.status(500).json({ message: 'Error to insert inscription', insert: false })
         }
@@ -164,52 +202,63 @@ app.post('/inscription', authenticate, async (request, response) => {
     })
 })
 
-app.get('/athlete', authenticate, async (request, response) => {
-    const { cpf } = request.query
+app.get("/athlete", authenticate, (req, res) => {
+  const id = req.query.id || req.user?.id
 
-    if (!cpf) {
-        return response.status(400).json({ message: 'CPF is required' })
+  if (!id) {
+    return res.status(400).json({ message: "ID is required" })
+  }
+
+  const query = `
+    SELECT 
+      athlete.id,
+      athlete.email,
+      athlete.password_hash,
+      athlete.salt,
+      athlete.encrypted_cpf,
+      athlete.full_legal_name,
+      athlete.prefered_name,
+      gender.ptbr_name AS gender_name,
+      athlete.birthday,
+      athlete.height,
+      athlete.weight,
+      athlete.sex,
+      athlete.kyu,
+      athlete.dan,
+      athlete.dojo,
+      athlete.city,
+      athlete.wins,
+      athlete.defeats
+    FROM athlete
+    JOIN gender
+      ON athlete.gender_name = gender.name
+    WHERE athlete.id = ?
+  `
+
+  db.query(query, [id], (err, results) => {
+    if (err) {
+      console.error(err)
+      return res.status(500).json({ message: "Error to get athlete info" })
     }
 
-    const encryptedCpf = crypto.createHash('sha256').update(cpf).digest('hex')
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Athlete not found" })
+    }
 
-    const query = `
-        SELECT 
-            athlete.email,
-            athlete.password_hash,
-            athlete.salt,
-            athlete.encrypted_cpf,
-            athlete.full_legal_name,
-            athlete.prefered_name,
-            gender.ptbr_name AS gender_name,
-            athlete.birthday,
-            athlete.height,
-            athlete.weight,
-            athlete.sex,
-            athlete.kyu,
-            athlete.dan,
-            athlete.dojo,
-            athlete.city,
-            athlete.wins,
-            athlete.defeats
-        FROM athlete
-        JOIN gender
-        ON athlete.gender_name = gender.name
-        WHERE athlete.encrypted_cpf = ?
-    `
+    const athlete = results[0]
 
-    db.query(query, [encryptedCpf], (err, results) => {
-        if (err) {
-            return response.status(500).json({ message: 'Error to get athlete info' })
-        }
+    try {
+      athlete.cpf = passwordManager.decryptCPF(athlete.encrypted_cpf)
+      delete athlete.encrypted_cpf
+    } catch (e) {
+      console.error(e)
+      return res.status(500).json({ message: "Error decrypting CPF" })
+    }
 
-        if (results.length === 0) {
-            return response.status(404).json({ message: 'Athlete not found' })
-        }
-
-        return response.status(200).json({ athlete: results[0] })
-    })
+    return res.status(200).json({ athlete })
+  })
 })
+
 
 app.listen(PORT, () => {
     console.log(`Rodando o servidor em http://localhost:${PORT}`)
